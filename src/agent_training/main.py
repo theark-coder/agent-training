@@ -3,13 +3,59 @@ from pydantic import BaseModel
 from fastapi import Query
 from sqlalchemy.orm import Session
 from agent_training.database import engine, get_db
-from agent_training.models import User
+from agent_training.models import User, Conversation, Message
 app = FastAPI()
 
 class UserCreate(BaseModel):
     id: int
     name: str
     role: str
+class ConversationCreate(BaseModel):
+    user_id: int
+    title: str    
+class MessageCreate(BaseModel):
+    conversation_id: int
+    role: str
+    content: str
+@app.post("/conversations")
+def create_conversation(
+    conversation: ConversationCreate,
+    session: Session = Depends(get_db),
+):
+    db_conversation = Conversation(
+        user_id=conversation.user_id,
+        title=conversation.title,
+    )
+
+    session.add(db_conversation)
+    session.commit()
+
+    return {
+        "id": db_conversation.id,
+        "user_id": db_conversation.user_id,
+        "title": db_conversation.title,
+    }
+@app.post("/messages")
+def create_message(
+    message: MessageCreate,
+    session: Session = Depends(get_db),
+):
+    db_message = Message(
+        conversation_id=message.conversation_id,
+        role=message.role,
+        content=message.content,
+    )
+
+    session.add(db_message)
+    session.commit()
+
+    return {
+        "id": db_message.id,
+        "conversation_id": db_message.conversation_id,
+        "role": db_message.role,
+        "content": db_message.content,
+    }
+
 @app.post("/users")
 def create_user(user: UserCreate):
     db_user = User(
