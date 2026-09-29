@@ -4,6 +4,9 @@ from fastapi import Query
 from sqlalchemy.orm import Session
 from agent_training.database import engine, get_db
 from agent_training.models import User, Conversation, Message
+from agent_training.repositories.user_repository import UserRepository
+from agent_training.repositories.conversation_repository import ConversationRepository
+from agent_training.services.conversation_service import ConversationService
 app = FastAPI()
 
 class UserCreate(BaseModel):
@@ -22,13 +25,24 @@ def create_conversation(
     conversation: ConversationCreate,
     session: Session = Depends(get_db),
 ):
-    db_conversation = Conversation(
-        user_id=conversation.user_id,
-        title=conversation.title,
+    user_repo = UserRepository(session)
+    conversation_repo = ConversationRepository(session)
+
+    service = ConversationService(
+        user_repo,
+        conversation_repo,
     )
 
-    session.add(db_conversation)
-    session.commit()
+    try:
+        db_conversation = service.create_conversation(
+            conversation.user_id,
+            conversation.title,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
 
     return {
         "id": db_conversation.id,
@@ -57,29 +71,32 @@ def create_message(
     }
 
 @app.post("/users")
-def create_user(user: UserCreate):
+def create_user(
+    user: UserCreate,
+    session: Session = Depends(get_db),
+):
     db_user = User(
         id=user.id,
         name=user.name,
         role=user.role,
     )
-    session = Session(engine)
+
     session.add(db_user)
     session.commit()
-   
+
     return {
-        "id": user.id,
-        "name": user.name,
-        "role": user.role,
+        "id": db_user.id,
+        "name": db_user.name,
+        "role": db_user.role,
     }
-
-
 @app.get("/hello")
 def hello(name: str = Query(min_length=2)):
     return {"message": f"Hello, {name}!"}
 @app.put("/db/users/{user_id}")
-def update_user(user_id: int):
-    session = Session(engine)
+def update_user(
+    user_id: int,
+    session: Session = Depends(get_db),
+):
 
     user = session.query(User).filter(User.id == user_id).first()
     if user is None:
@@ -105,8 +122,10 @@ def get_db_user(user_id: int, session: Session = Depends(get_db)):
 
     return user
 @app.delete("/db/users/{user_id}")
-def delete_user(user_id: int):
-    session = Session(engine)
+def delete_user(
+    user_id: int,
+    session: Session = Depends(get_db),
+):
 
     user = session.query(User).filter(User.id == user_id).first()
     if user is None:
