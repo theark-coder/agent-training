@@ -21,3 +21,9 @@ engine = create_engine(DATABASE_URL)
 
 with engine.connect() as connection:
     print("MySQL connected!")
+def get_db():
+    session = Session(engine)
+    try:
+        yield session
+    finally:
+        session.close()
