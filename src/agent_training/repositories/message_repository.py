@@ -20,7 +20,7 @@ class MessageRepository:
         content=content,
        )
        self.session.add(message)
-       self.session.commit()
+      
 
        return message
 

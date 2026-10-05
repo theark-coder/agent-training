@@ -7,6 +7,7 @@ from agent_training.models import User, Conversation, Message
 from agent_training.repositories.user_repository import UserRepository
 from agent_training.repositories.conversation_repository import ConversationRepository
 from agent_training.services.conversation_service import ConversationService
+from agent_training.repositories.message_repository import MessageRepository
 app = FastAPI()
 
 class UserCreate(BaseModel):
@@ -135,4 +136,38 @@ def delete_user(
     session.commit()
     return {
     "message": "User deleted successfully"
+    }
+@app.post("/conversations/with-message")
+def create_conversation_with_message(
+    conversation: ConversationCreate,
+    session: Session = Depends(get_db),
+):
+    user_repo = UserRepository(session)
+    conversation_repo = ConversationRepository(session)
+    message_repo = MessageRepository(session)
+
+    service = ConversationService(
+        user_repo,
+        conversation_repo,
+        message_repo,
+    )
+
+    try:
+        db_conversation, db_message = service.create_conversation_with_message(
+            conversation.user_id,
+            conversation.title,
+            "user",
+            "这是事务测试消息",
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
+
+    return {
+        "conversation_id": db_conversation.id,
+        "message_id": db_message.id,
+        "title": db_conversation.title,
+        "message": db_message.content,
     }

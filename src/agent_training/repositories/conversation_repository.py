@@ -15,7 +15,7 @@ class ConversationRepository:
         )
 
         self.session.add(conversation)
-        self.session.commit()
+        self.session.flush()
 
         return conversation
 
