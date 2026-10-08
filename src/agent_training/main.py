@@ -153,18 +153,20 @@ def create_conversation_with_message(
     )
 
     try:
-        db_conversation, db_message = service.create_conversation_with_message(
+        db_conversation = service.create_conversation(
             conversation.user_id,
             conversation.title,
-            "user",
-            "这是事务测试消息",
         )
+        session.commit()
     except ValueError as exc:
+        session.rollback()
         raise HTTPException(
             status_code=404,
             detail=str(exc),
-        )
-
+        ) from exc
+    except Exception:
+        session.rollback()
+        raise
     return {
         "conversation_id": db_conversation.id,
         "message_id": db_message.id,
