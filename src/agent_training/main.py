@@ -8,30 +8,34 @@ from agent_training.repositories.user_repository import UserRepository
 from agent_training.repositories.conversation_repository import ConversationRepository
 from agent_training.services.conversation_service import ConversationService
 from agent_training.repositories.message_repository import MessageRepository
-app = FastAPI()
 
-class UserCreate(BaseModel):
-    id: int
-    name: str
-    role: str
-class ConversationCreate(BaseModel):
-    user_id: int
-    title: str    
-class MessageCreate(BaseModel):
-    conversation_id: int
-    role: str
-    content: str
-@app.post("/conversations")
+from typing import Literal
+
+
+from sqlalchemy.exc import IntegrityError
+
+from agent_training.schemas import (
+    UserCreate,
+    UserResponse,
+    ConversationCreate,
+    ConversationResponse,
+    MessageCreate,
+    MessageResponse,
+)
+app = FastAPI()
+@app.post(
+    "/conversations",
+    response_model=ConversationResponse,
+    status_code=201,
+)
 def create_conversation(
     conversation: ConversationCreate,
     session: Session = Depends(get_db),
 ):
-    user_repo = UserRepository(session)
-    conversation_repo = ConversationRepository(session)
-
     service = ConversationService(
-        user_repo,
-        conversation_repo,
+        UserRepository(session),
+        ConversationRepository(session),
+        MessageRepository(session),
     )
 
     try:
@@ -39,39 +43,57 @@ def create_conversation(
             conversation.user_id,
             conversation.title,
         )
+        session.commit()
+        session.refresh(db_conversation)
     except ValueError as exc:
+        session.rollback()
         raise HTTPException(
             status_code=404,
             detail=str(exc),
-        )
+        ) from exc
+    except Exception:
+        session.rollback()
+        raise
 
-    return {
-        "id": db_conversation.id,
-        "user_id": db_conversation.user_id,
-        "title": db_conversation.title,
-    }
-@app.post("/messages")
+    return db_conversation
+
+@app.post(
+    "/messages",
+    response_model=MessageResponse,
+    status_code=201,
+)
 def create_message(
     message: MessageCreate,
     session: Session = Depends(get_db),
 ):
+    conversation = session.get(
+        Conversation,
+        message.conversation_id,
+    )
+
+    if conversation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found",
+        )
+
     db_message = Message(
         conversation_id=message.conversation_id,
         role=message.role,
         content=message.content,
     )
 
-    session.add(db_message)
-    session.commit()
+    try:
+        session.add(db_message)
+        session.commit()
+        session.refresh(db_message)
+    except Exception:
+        session.rollback()
+        raise
 
-    return {
-        "id": db_message.id,
-        "conversation_id": db_message.conversation_id,
-        "role": db_message.role,
-        "content": db_message.content,
-    }
+    return db_message
 
-@app.post("/users")
+@app.post("/users", response_model=UserResponse, status_code=201)
 def create_user(
     user: UserCreate,
     session: Session = Depends(get_db),
@@ -82,14 +104,18 @@ def create_user(
         role=user.role,
     )
 
-    session.add(db_user)
-    session.commit()
+    try:
+        session.add(db_user)
+        session.commit()
+        session.refresh(db_user)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="User ID already exists",
+        ) from exc
 
-    return {
-        "id": db_user.id,
-        "name": db_user.name,
-        "role": db_user.role,
-    }
+    return db_user
 @app.get("/hello")
 def hello(name: str = Query(min_length=2)):
     return {"message": f"Hello, {name}!"}
