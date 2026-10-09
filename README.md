@@ -84,17 +84,18 @@ uv run uvicorn agent_training.main:app --reload
 
 成功启动后，终端应显示类似：
 
-```text
-MySQL connected!
-Application startup complete.
-```
+
 
 打开 API 文档：
 
 http://127.0.0.1:8000/docs
 
 ## 6. 接口示例
+GET /health：检查应用是否能响应请求。
 
+
+
+GET /ready：检查数据库是否可连接。
 ### 创建用户
 
 `POST /users`
@@ -166,15 +167,18 @@ uv run pytest
 
 ```text
 agent-training/
-├── src/
-│   └── agent_training/
-│       ├── main.py
-│       ├── database.py
-│       ├── models.py
-│       ├── repositories/
-│       └── services/
-├── tests/
-├── notes/
+├── src/agent_training/
+│   ├── main.py                 # HTTP 路由
+│   ├── schemas.py              # 请求/响应校验
+│   ├── config.py               # 环境变量配置
+│   ├── database.py             # SQLAlchemy 引擎和 Session
+│   ├── models.py               # ORM 数据模型
+│   ├── repositories/           # 数据访问层
+│   ├── services/               # 业务逻辑层
+│   ├── async_demo.py           # 异步、超时、并发实验
+│   └── llm_test.py             # 模型调用实验代码
+├── tests/                      # 自动化测试
+├── .env.example                # 配置模板，无真实密钥
 ├── pyproject.toml
 ├── uv.lock
 └── README.md
