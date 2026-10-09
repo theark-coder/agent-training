@@ -10,6 +10,8 @@ from agent_training.services.conversation_service import ConversationService
 from agent_training.repositories.message_repository import MessageRepository
 
 from typing import Literal
+from sqlalchemy.exc import SQLAlchemyError
+from agent_training.database import check_database
 
 
 from sqlalchemy.exc import IntegrityError
@@ -44,7 +46,7 @@ def create_conversation(
                 conversation.user_id,
                 conversation.title,
                 "user",
-                "这是事务测试消息",
+                "这是事务测试消息", 
             )
         )
     except ValueError as exc:
@@ -201,4 +203,24 @@ def create_conversation_with_message(
         "message_id": db_message.id,
         "title": db_conversation.title,
         "message": db_message.content,
+    }
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "service": "agent-training",
+    }
+@app.get("/ready")
+def readiness():
+    try:
+        check_database()
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Database unavailable",
+        ) from exc
+
+    return {
+        "status": "ready",
+        "database": "ok",
     }

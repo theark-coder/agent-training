@@ -1,29 +1,31 @@
-import os
-
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import URL, create_engine, text
 from sqlalchemy.orm import Session
-from agent_training.models import Base
-from agent_training.models import User
-load_dotenv()
 
-MYSQL_HOST = os.getenv("MYSQL_HOST")
-MYSQL_PORT = os.getenv("MYSQL_PORT")
-MYSQL_USER = os.getenv("MYSQL_USER")
-MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
-MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
-DATABASE_URL = (
-    f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}"
-    f"@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+from agent_training.config import get_settings
+
+settings = get_settings()
+
+DATABASE_URL = URL.create(
+    drivername="mysql+pymysql",
+    username=settings.mysql_user,
+    password=settings.mysql_password,
+    host=settings.mysql_host,
+    port=settings.mysql_port,
+    database=settings.mysql_database,
 )
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+)
 
-with engine.connect() as connection:
-    print("MySQL connected!")
+
+def check_database() -> bool:
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return True
+
+
 def get_db():
-    session = Session(engine)
-    try:
+    with Session(engine) as session:
         yield session
-    finally:
-        session.close()
