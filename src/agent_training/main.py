@@ -39,23 +39,26 @@ def create_conversation(
     )
 
     try:
-        db_conversation = service.create_conversation(
-            conversation.user_id,
-            conversation.title,
+        db_conversation, db_message = (
+            service.create_conversation_with_message(
+                conversation.user_id,
+                conversation.title,
+                "user",
+                "这是事务测试消息",
+            )
         )
-        session.commit()
-        session.refresh(db_conversation)
     except ValueError as exc:
-        session.rollback()
         raise HTTPException(
             status_code=404,
             detail=str(exc),
         ) from exc
-    except Exception:
-        session.rollback()
-        raise
 
-    return db_conversation
+    return {
+        "conversation_id": db_conversation.id,
+        "message_id": db_message.id,
+        "title": db_conversation.title,
+        "message": db_message.content,
+    }
 
 @app.post(
     "/messages",
